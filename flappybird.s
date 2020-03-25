@@ -57,33 +57,67 @@ draw_pipe_prep:
 	lw $t1, pipeColor		# $t1 stores the pipe color
 	lw $t2, skyColor		# $t2 stores the skycolor
 	li $t3, 12			# distance of pipe from top, between 2-22
-	li $t4, 33			# location of pipe
-	li $t6, 0			# $t6 stores counter
+	li $t4, 32			# location of pipe
+
 
 pipe_branch:
-	subi $t4, $t4, 1		# move pipe closer
-	li $t5, 32			# $t5 stores 32
+	li $v0, 32
+	li $a0, 160
+	syscall
+	li $t6, 0			# $t6 stores counter
 	lw $t0, displayAddress		# $t0 stores display
-	addi $t0, $t0, 124		# set location
-	beq $t4, $t5, draw_pipe32	# branch to draw pipe at location 32
-
-draw_pipe32:
+	subi $t4, $t4, 1		# move pipe closer
+	li $t7, 31
+	sgt $t5, $t4, $t7 
+	bne $t5, $zero, pipe_branch
+	li $t7, 27
+	sgt $t5, $t4, $t7 
+	bne $t5, $zero, draw_pipeR
+	li $t7, -1
+	sgt $t5, $t4, $t7 
+	bne $t5, $zero, draw_pipeM
+	li $t7, -5
+	sgt $t5, $t4, $t7 
+	bne $t5, $zero, draw_pipeL
+	li $t4, 32
+	j pipe_branch
+	
+draw_pipeR:
+	li $t7, 4
+	mult $t7, $t4
+	mflo $t7
+	add $t0, $t0, $t7		# set location
+Rloop:
 	addi $t6, $t6, 1		# increment $t6
 	sw $t1, 0($t0)			# paint pipe 
 	addi $t0, $t0, 128
-	bne $t6, 32, draw_pipe32
+	bne $t6, 32, Rloop
+	j pipe_branch
 
-draw_pipe31:
+draw_pipeM:
+	li $t7, 4
+	mult $t7, $t4
+	mflo $t7
+	add $t0, $t0, $t7	
+Mloop:
+	addi $t6, $t6, 1		# increment $t6
+	sw $t1, 0($t0)			# paint pipe 
+	sw $t2, 16($t0)
+	addi $t0, $t0, 128
+	bne $t6, 32, Mloop
+	j pipe_branch
 
-draw_pipe30:
-
-draw_pipe:
-
-draw_pipe2:
-
-draw_pipe1:
-
-draw_pipe0:
+draw_pipeL:
+	li $t7, 4
+	mult $t7, $t4
+	mflo $t7
+	add $t0, $t0, $t7	
+Lloop:
+	addi $t6, $t6, 1		# increment $t6 
+	sw $t2, 16($t0)
+	addi $t0, $t0, 128
+	bne $t6, 32, Lloop
+	j pipe_branch
 
 pipe_skip:
 

@@ -56,7 +56,11 @@ full_fill:
 draw_pipe_prep:
 	lw $t1, pipeColor		# $t1 stores the pipe color
 	lw $t2, skyColor		# $t2 stores the skycolor
-	li $t3, 12			# distance of pipe from top, between 2-22
+	li $a1, 16 
+    	li $v0, 42
+    	syscall
+	addi $a0, $a0, 2
+    	move $t3, $a0   		# distance of pipe from top, between 2-18
 	li $t4, 32			# location of pipe
 
 
@@ -80,7 +84,7 @@ pipe_branch:
 	sgt $t5, $t4, $t7 
 	bne $t5, $zero, draw_pipeL
 	li $t4, 32
-	j pipe_branch
+	j draw_pipe_prep
 	
 draw_pipeR:
 	li $t7, 4
@@ -91,6 +95,8 @@ Rloop:
 	addi $t6, $t6, 1		# increment $t6
 	sw $t1, 0($t0)			# paint pipe 
 	addi $t0, $t0, 128
+	li $t5, 0
+	beq $t6, $t3, Rskip
 	bne $t6, 32, Rloop
 	j pipe_branch
 
@@ -104,6 +110,8 @@ Mloop:
 	sw $t1, 0($t0)			# paint pipe 
 	sw $t2, 16($t0)
 	addi $t0, $t0, 128
+	li $t5, 0
+	beq $t6, $t3, Mskip
 	bne $t6, 32, Mloop
 	j pipe_branch
 
@@ -116,10 +124,29 @@ Lloop:
 	addi $t6, $t6, 1		# increment $t6 
 	sw $t2, 16($t0)
 	addi $t0, $t0, 128
+	li $t5, 0
+	beq $t6, $t3, Lskip
 	bne $t6, 32, Lloop
 	j pipe_branch
 
-pipe_skip:
+Rskip:
+	addi $t6, $t6, 1
+	addi $t5, $t5, 1
+	addi $t0, $t0, 128
+	bne $t5, 12, Rskip
+	j Rloop
+Mskip:
+	addi $t6, $t6, 1
+	addi $t5, $t5, 1
+	addi $t0, $t0, 128
+	bne $t5, 12, Mskip
+	j Mloop
+Lskip:
+	addi $t6, $t6, 1
+	addi $t5, $t5, 1
+	addi $t0, $t0, 128
+	bne $t5, 12, Lskip
+	j Lloop
 
 Exit:
 	li $v0, 10 # terminate the program gracefully

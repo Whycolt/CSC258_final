@@ -33,120 +33,98 @@
 # - Bird 7 units ahead
 # - Pipe 4 units wide, 8 units apart, 12 units between pipes
 # - bid 4 units long, 3 units high
+
+# - pipe 1 memory -> $s0
 .data
-	displayAddress:	.word	0x10008000
-	birdColor: .word 0xD1C429
-	pipeColor: .word 0x74C029
-	skyColor: .word 0x72C7D0
+	birdColor: .word 0xD1C429	# Color of bird
+	pipeColor: .word 0x74C029	# Color of pipes
+	skyColor: .word 0x72C7D0	# Color of sky
+	s0: .space 8			# Space allocated for Pipe 1
 .globl main
 .text
 
-main:
-	lw $t1, skyColor 		# $t1 stores the sky color
-	lw $t0, displayAddress		# $t0 stores the base address for display
-	li $t2, 0			# $t2 stores a counter
-	li $t3, 1024			# $t3 stores the counte limit
+main:			# Load memory addresses
+	la $s0, s0			# Store pipe 1 memory address at $s0
 
-full_fill:
-	sw $t1, 0($t0)			# paint unit
-	addi $t0, $t0, 4		# increment address
+full_fill_prep:		# Prep for filling background
+	add $t0, $zero, $gp		# Load bitmap address to $t0
+	lw $t1, skyColor		# Load sky color to #t1
+	li $t2, 0			# Store a counter at $t2
+	li $t3, 1024			# Store the counter limit at $t3
+
+full_fill:		# Loop for filling background
+	sw $t1, 0($t0)			# paint a unit on bitmap
+	addi $t0, $t0, 4		# increment bitmap address
 	addi $t2, $t2, 1		# increment counter
-	bne $t2, $t3, full_fill 	# loop		
+	bne $t2, $t3, full_fill 	# loop drawing background		
 
-draw_pipe_prep:
-	lw $t1, pipeColor		# $t1 stores the pipe color
-	lw $t2, skyColor		# $t2 stores the skycolor
-	li $a1, 16 
-    	li $v0, 42
+draw_pipe1_prep:	# Initiating a pipe	
+	li $a1, 16 			# Load random number max to $a1
+    	li $v0, 42			# Load random generator syscall to $v0
     	syscall
-	addi $a0, $a0, 2
-    	move $t3, $a0   		# distance of pipe from top, between 2-18
-	li $t4, 32			# location of pipe
+	addi $a0, $a0, 2		# Add 2 to randomly generator number, now between 2-18
+    	sw $a0, 0($s0)			# Store random number to pipe 1 memory
+	li $t0, 32   			# Set location of pipe 1
+	sw $t0	4($s0)			# Store location of pipe 1 to pipe 1 memory
 
-
-pipe_branch:
-	li $v0, 32
-	li $a0, 160
+game_loop:		# --GAME LOOP--
+	li $v0, 32			# Load pause syscall to $v0
+	li $a0, 160			# Load pause duration to $a0
 	syscall
-	li $t6, 0			# $t6 stores counter
-	lw $t0, displayAddress		# $t0 stores display
-	subi $t4, $t4, 1		# move pipe closer
-	li $t7, 31
-	sgt $t5, $t4, $t7 
-	bne $t5, $zero, pipe_branch
-	li $t7, 27
-	sgt $t5, $t4, $t7 
-	bne $t5, $zero, draw_pipeR
-	li $t7, -1
-	sgt $t5, $t4, $t7 
-	bne $t5, $zero, draw_pipeM
-	li $t7, -5
-	sgt $t5, $t4, $t7 
-	bne $t5, $zero, draw_pipeL
-	li $t4, 32
-	j draw_pipe_prep
-	
-draw_pipeR:
-	li $t7, 4
-	mult $t7, $t4
+	jal pipe1_branch		# Draw Pipe 1 method
+	j game_loop			# loop game
+
+pipe1_branch:		# Drawing pipe 1 method head
+	add $t0, $zero, $gp		# Load bitmap address to $t0
+	lw $t1, pipeColor		# Load pipe color into $t1
+	lw $t2, skyColor		# Load sky color to $t2
+	lw $t3, 0($s0)			# Load pipe gap top to $t3
+	lw $t4, 4($s0)			# Load pipe location to $t4
+	li $t6, 0			# Store a counter at $t6
+	subi $t4, $t4, 1		# Decrement pipe location
+	li $t7, 4			# Set $t7 to 4
+	mult $t7, $t4			# Get address offset of pipe for bitmap
 	mflo $t7
-	add $t0, $t0, $t7		# set location
-Rloop:
-	addi $t6, $t6, 1		# increment $t6
+	add $t0, $t0, $t7		# Add offest to bitmap address
+	bge $t4, 32, pipe1_branch	# Loop, Nothing drawn
+	bge $t4, -4, Pipe1Loop		# Draw pipe when in locations on screen
+	j draw_pipe1_prep		# Generate new pipe
+
+Pipe1Loop:			# Draw pipe 1 loop
+	addi $t6, $t6, 1		# Increment counter
+	bge $t4, 28, Pipe1R		# Draw pipe comming in from right
+	bge $t4, 0, Pipe1M		# Draw pipe when moving through middle
+
+Pipe1L:				# Draw pipe 1 disappearing into left
+	sw $t2, 16($t0)			# paint back of pipe over with sky
+	j Pipe1End			# Go to rest of loop
+
+Pipe1R:				# Draw pipe 1 appearing from right
+	sw $t1, 0($t0)			# Paint pipe
+	j Pipe1End			# Go to rest of loop
+
+Pipe1M:				# Draw pipe 1 moving through middle
 	sw $t1, 0($t0)			# paint pipe 
-	addi $t0, $t0, 128
-	li $t5, 0
-	beq $t6, $t3, Rskip
-	bne $t6, 32, Rloop
-	j pipe_branch
+	sw $t2, 16($t0)			# paint back of pipe over with sky
 
-draw_pipeM:
-	li $t7, 4
-	mult $t7, $t4
-	mflo $t7
-	add $t0, $t0, $t7	
-Mloop:
-	addi $t6, $t6, 1		# increment $t6
-	sw $t1, 0($t0)			# paint pipe 
-	sw $t2, 16($t0)
-	addi $t0, $t0, 128
-	li $t5, 0
-	beq $t6, $t3, Mskip
-	bne $t6, 32, Mloop
-	j pipe_branch
+Pipe1End:			# Rest of pipe 1 loop
+	addi $t0, $t0, 128		# Increment bitmap address
+	li $t5, 0			# Store a counter at $t5 for gap
+	beq $t6, $t3, Pipe1Skip		# If at gap position, do gap method
+	bne $t6, 32, Pipe1Loop		# Loops until pipe is fully drawn
+	j pipe1_store			# Save variables into memory
 
-draw_pipeL:
-	li $t7, 4
-	mult $t7, $t4
-	mflo $t7
-	add $t0, $t0, $t7	
-Lloop:
-	addi $t6, $t6, 1		# increment $t6 
-	sw $t2, 16($t0)
-	addi $t0, $t0, 128
-	li $t5, 0
-	beq $t6, $t3, Lskip
-	bne $t6, 32, Lloop
-	j pipe_branch
+Pipe1Skip:			# Draw pipe 1 gap 
+	addi $t6, $t6, 1		# Increment pipe counter
+	addi $t5, $t5, 1		# Increment gap counter
+	addi $t0, $t0, 128		# Increment bitmap address
+	bne $t5, 12, Pipe1Skip		# Loop skip until gap is 12 units long
+	j Pipe1Loop			# Return to drawing pipe loop
 
-Rskip:
-	addi $t6, $t6, 1
-	addi $t5, $t5, 1
-	addi $t0, $t0, 128
-	bne $t5, 12, Rskip
-	j Rloop
-Mskip:
-	addi $t6, $t6, 1
-	addi $t5, $t5, 1
-	addi $t0, $t0, 128
-	bne $t5, 12, Mskip
-	j Mloop
-Lskip:
-	addi $t6, $t6, 1
-	addi $t5, $t5, 1
-	addi $t0, $t0, 128
-	bne $t5, 12, Lskip
-	j Lloop
+pipe1_store:			# Store pipe 1 variables into memory
+	sw $t3 0($s0)			# Save pipe gap top into memory
+	sw $t4 4($s0)			# Save pipe location into memory
+	jr $ra				# Return to game loop
 
 Exit:
 	li $v0, 10 # terminate the program gracefully
